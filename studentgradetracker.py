@@ -1,268 +1,171 @@
-[
-  {
-    "id": "S001",
-    "name": "beril tamer",
-    "email": "beril@example.com",
-    "courses": ["CS101"]
-  }
-]
-
 import json
 
 def load_students(path: str) -> list:
-    with open(path, "r") as f:
-        return json.load(f)
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return []
 
 def save_students(path: str, students: list) -> None:
     with open(path, "w") as f:
-        json.dump(students, f, indent=4)
+        json.dump(students, f, indent=2)
 
-def add_student(students: list, student_data: dict) -> dict:
+def add_student(students: list, student_data: dict) -> list:
     students.append(student_data)
-    return student_data
+    return students
 
 def update_student(students: list, student_id: str, updates: dict) -> dict:
-    for st in students:
-        if st["id"] == student_id:
-            st.update(updates)
-            return st
-    return None
+    for s in students:
+        if s["id"] == student_id:
+          s.update(updates) 
+          return s
+return {} 
 
-def enroll_student(course_roster: dict, student_id: str) -> dict:
-    if student_id not in course_roster["students"]:
-        course_roster["students"].append(student_id)
-    return course_roster
-
-def withdraw_student(course_roster: dict, student_id: str) -> dict:
-    if student_id in course_roster["students"]:
-        course_roster["students"].remove(student_id)
-    return course_roster
-  
-DEFAULT_MIN = 0
-DEFAULT_MAX = 100
-
-
-def validate_score(score: float) -> float:
-    if score < DEFAULT_MIN or score > DEFAULT_MAX:
-        raise ValueError("Score must be between 0 and 100")
-    return score
-
-
-def record_grade(gradebook: dict, course_id: str, student_id: str,
-                 assessment_id: str, score: float, weight: float) -> dict:
-
-    validate_score(score)
-
-    course = gradebook.setdefault(course_id, {"students": {}})
-    student = course["students"].setdefault(student_id, {"assessments": {}})
-
-    student["assessments"][assessment_id] = {
-        "score": score,
-        "weight": weight
-    }
-
+def record_grade(gradebook: dict, course_id: str, student_id: str, assessment: dict) -> dict:
+    course = gradebook.setdefault(course_id, {})
+    student = course.setdefault(student_id, [])
+    student.append(assessment)
     return gradebook
 
+def update_grade(gradebook, course_id, student_id, assessment_id, new_score):
+    for a in gradebook[course_id][student_id]:
+        if a["id"] == assessment_id:
+            a["score"] = new_score
+            return a
+    return {}
 
-def update_grade(gradebook: dict, course_id: str, student_id: str,
-                 assessment_id: str, new_score: float) -> dict:
-
-    validate_score(new_score)
-
-    gradebook[course_id]["students"][student_id]["assessments"][assessment_id]["score"] = new_score
+def delete_grade(gradebook, course_id, student_id, assessment_id):
+    items = gradebook[course_id][student_id]
+    gradebook[course_id][student_id] = [a for a in items if a["id"] != assessment_id]
     return gradebook
 
+def calculate_student_average(gradebook, course_id, student_id):
+    grades = gradebook.get(course_id, {}).get(student_id, [])
+    if not grades:
+        return 0
+    total = sum(g["score"] for g in grades)
+    return total / len(grades)
 
-def delete_grade(gradebook: dict, course_id: str, student_id: str,
-                 assessment_id: str) -> dict:
+def calculate_course_average(gradebook, course_id):
+    course = gradebook.get(course_id, {})
+    if not course:
+        return 0
+    avgs = []
+    for sid in course:
+        avgs.append(calculate_student_average(gradebook, course_id,sid))
+    return sum(avgs)/ len(avgs)
+  def grade_distribution(gradebook, course_id, bins):
+    course = gradebook.get(course_id, {})
+    scores = []
 
-    student = gradebook[course_id]["students"][student_id]
-    student["assessments"].pop(assessment_id, None)
-    return gradebook
+    for sid in course:
+        for a in course[sid]:
+            scores.append(a["score"])
 
+    dist = {b: 0 for b in bins}
 
-def calculate_student_average(gradebook: dict, course_id: str,
-                              student_id: str) -> float:
-
-    assessments = gradebook[course_id]["students"][student_id]["assessments"]
-
-    if not assessments:
-        return 0.0
-
-    total = 0
-    weight_sum = 0
-
-    for a in assessments.values():
-        total += a["score"] * a["weight"]
-        weight_sum += a["weight"]
-
-    return total / weight_sum if weight_sum > 0 else 0.0
-
-
-def calculate_course_average(gradebook: dict, course_id: str) -> float:
-
-    students = gradebook[course_id]["students"]
-
-    if not students:
-        return 0.0
-
-    totals = []
-
-    for student_id in students:
-        totals.append(calculate_student_average(gradebook, course_id, student_id))
-
-    return sum(totals) / len(totals)
-  def grade_distribution(gradebook: dict, course_id: str, bins: list[int]) -> dict:
-    """
-    bins örnek: [0, 60, 70, 80, 90, 100]
-    """
-    distribution = {f"{bins[i]}-{bins[i+1]}": 0 for i in range(len(bins) - 1)}
-
-    students = gradebook[course_id]["students"]
-
-    for sid in students:
-        avg = calculate_student_average(gradebook, course_id, sid)
-
-        for i in range(len(bins) - 1):
-            if bins[i] <= avg <= bins[i+1]:
-                distribution[f"{bins[i]}-{bins[i+1]}"] += 1
+    for s in scores:
+        for b in bins:
+            if s <= b:
+                dist[b] += 1
                 break
 
-    return distribution
+    return dist
 
+def top_performers(gradebook, course_id, limit=3):
+    course = gradebook.get(course_id, {})
+    results = []
 
-def top_performers(gradebook: dict, course_id: str, limit: int = 5) -> list:
-    students = gradebook[course_id]["students"]
+    for sid in course:
+        total = sum(a["score"] for a in course[sid])
+        count = len(course[sid])
+        avg = total / count if count else 0
+        results.append((sid, avg))
 
-    ranking = []
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results[:limit]
 
-    for sid in students:
-        avg = calculate_student_average(gradebook, course_id, sid)
-        ranking.append((sid, avg))
-
-    ranking.sort(key=lambda x: x[1], reverse=True)
-
-    return ranking[:limit]
-
-
-def student_progress_report(gradebook: dict, course_id: str, student_id: str) -> dict:
-    student = gradebook[course_id]["students"][student_id]
-    avg = calculate_student_average(gradebook, course_id, student_id)
-
-    return {
-        "student_id": student_id,
-        "assessments": student["assessments"],
-        "average": avg,
-        "status": "OK" if avg >= 60 else "At Risk"
-    }
-
-
-def export_report(report: dict, filename: str) -> str:
-    with open(filename, "w") as f:
-        for k, v in report.items():
-            f.write(f"{k}: {v}\n")
-        return filename
-      import json
-import csv
+def student_progress_report(gradebook, course_id, student_id):
+    return gradebook.get(course_id, {}).get(student_id, [])
+  
+import json
 import os
-import shutil
-from typing import tuple, list, dict
 
+def load_state(base_dir: str):
+    def read(name):
+        path = os.path.join(base_dir, name)
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except:
+            return {}
 
-def load_state(base_dir: str) -> tuple[list, list, dict, dict]:
-    """
-    base_dir içindeki JSON dosyalarını okuyarak sistemi geri yükler.
+    return (
+        read("students.json"),
+        read("courses.json"),
+        read("grades.json"),
+        read("settings.json")
+    )
 
-    Beklenen dosyalar:
-      students.json
-      courses.json
-      gradebook.json
-      settings.json
-    """
+def save_state(base_dir, students, courses, gradebook, settings):
+    def write(name, data):
+        with open(os.path.join(base_dir, name), "w") as f:
+            json.dump(data, f, indent=2)
 
-    def _load_json(path, default):
-        if not os.path.exists(path):
-            return default
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+    write("students.json", students)
+    write("courses.json", courses)
+    write("grades.json", gradebook)
+    write("settings.json", settings)
+  
+  def assign_letter_grade(score):
+    if score >= 90: return "A"
+    if score >= 80: return "B"
+    if score >= 70: return "C"
+    if score >= 60: return "D"
+    return "F"
 
-    students = _load_json(os.path.join(base_dir, "students.json"), [])
-    courses = _load_json(os.path.join(base_dir, "courses.json"), [])
-    gradebook = _load_json(os.path.join(base_dir, "gradebook.json"), {})
-    settings = _load_json(os.path.join(base_dir, "settings.json"), {})
+from roster import *
+from grades import *
+from storage import *
+from config import *
 
-    return students, courses, gradebook, settings
+BASE = "data"
 
+students, courses, gradebook, settings = load_state(BASE)
 
-def save_state(
-    base_dir: str,
-    students: list,
-    courses: list,
-    gradebook: dict,
-    settings: dict
-) -> None:
-    """
-    Mevcut durumu JSON dosyalarına kaydeder.
-    """
+def menu():
+    while True:
+        print("\n1) Öğrenci ekle")
+        print("2) Not ekle")
+        print("3) Ortalama bak")
+        print("4) Çıkış")
 
-    os.makedirs(base_dir, exist_ok=True)
+        c = input("> ")
 
-    def _save_json(path, data):
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+        if c == "1":
+            sid = input("id: ")
+            name = input("isim: ")
+            students.append({"id": sid, "name": name})
+            save_state(BASE, students, courses, gradebook, settings)
 
-    _save_json(os.path.join(base_dir, "students.json"), students)
-    _save_json(os.path.join(base_dir, "courses.json"), courses)
-    _save_json(os.path.join(base_dir, "gradebook.json"), gradebook)
-    _save_json(os.path.join(base_dir, "settings.json"), settings)
+        elif c == "2":
+            cid = input("course id: ")
+            sid = input("student id: ")
+            aid = input("assessment id: ")
+            score = float(input("score: "))
+            record_grade(gradebook, cid, sid, {"id": aid, "score": score})
+            save_state(BASE, students, courses, gradebook, settings)
 
+        elif c == "3":
+            cid = input("course id: ")
+            sid = input("student id: ")
+            avg = calculate_student_average(gradebook, cid, sid)
+            print("avg =", avg, "=>", assign_letter_grade(avg))
 
-def backup_state(base_dir: str, backup_dir: str) -> list[str]:
-    """
-    base_dir içindeki tüm JSON dosyalarını backup_dir içine kopyalar
-    ve backup’a alınan dosyaların listesini döner.
-    """
+        else:
+            save_state(BASE, students, courses, gradebook, settings)
+            break
 
-    os.makedirs(backup_dir, exist_ok=True)
-
-    backed_up = []
-
-    for filename in os.listdir(base_dir):
-        if filename.endswith(".json"):
-            src = os.path.join(base_dir, filename)
-            dst = os.path.join(backup_dir, filename)
-            shutil.copy2(src, dst)
-            backed_up.append(filename)
-
-    return backed_up
-
-
-def import_from_csv(csv_path: str, course_id: str) -> dict:
-    """
-    CSV dosyasından notları içe aktarır.
-
-    Beklenen CSV formatı:
-        student_id, assessment_id, score
-    """
-
-    results = {
-        "course_id": course_id,
-        "entries": []
-    }
-
-    with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-
-        for row in reader:
-            # basit doğrulama
-            if not row.get("student_id") or not row.get("assessment_id"):
-                continue
-
-            entry = {
-                "student_id": row["student_id"],
-                "assessment_id": row["assessment_id"],
-                "score": float(row.get("score", 0))
-            }
-
-            results["entries"].append(entry)
-          return results
+if __name__ == "__main__":
+    menu()
