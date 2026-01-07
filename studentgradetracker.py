@@ -18,9 +18,9 @@ def add_student(students: list, student_data: dict) -> list:
 def update_student(students: list, student_id: str, updates: dict) -> dict:
     for s in students:
         if s["id"] == student_id:
-          s.update(updates) 
-          return s
-return {} 
+            s.update(updates)
+            return s
+    return {}
 
 def record_grade(gradebook: dict, course_id: str, student_id: str, assessment: dict) -> dict:
     course = gradebook.setdefault(course_id, {})
@@ -53,9 +53,10 @@ def calculate_course_average(gradebook, course_id):
         return 0
     avgs = []
     for sid in course:
-        avgs.append(calculate_student_average(gradebook, course_id,sid))
-    return sum(avgs)/ len(avgs)
-  def grade_distribution(gradebook, course_id, bins):
+        avgs.append(calculate_student_average(gradebook, course_id, sid))
+    return sum(avgs) / len(avgs)
+
+def grade_distribution(gradebook, course_id, bins):
     course = gradebook.get(course_id, {})
     scores = []
 
@@ -88,7 +89,7 @@ def top_performers(gradebook, course_id, limit=3):
 
 def student_progress_report(gradebook, course_id, student_id):
     return gradebook.get(course_id, {}).get(student_id, [])
-  
+
 import json
 import os
 
@@ -117,55 +118,10 @@ def save_state(base_dir, students, courses, gradebook, settings):
     write("courses.json", courses)
     write("grades.json", gradebook)
     write("settings.json", settings)
-  
-  def assign_letter_grade(score):
+
+def assign_letter_grade(score):
     if score >= 90: return "A"
     if score >= 80: return "B"
     if score >= 70: return "C"
     if score >= 60: return "D"
     return "F"
-
-from roster import *
-from grades import *
-from storage import *
-from config import *
-
-BASE = "data"
-
-students, courses, gradebook, settings = load_state(BASE)
-
-def menu():
-    while True:
-        print("\n1) Öğrenci ekle")
-        print("2) Not ekle")
-        print("3) Ortalama bak")
-        print("4) Çıkış")
-
-        c = input("> ")
-
-        if c == "1":
-            sid = input("id: ")
-            name = input("isim: ")
-            students.append({"id": sid, "name": name})
-            save_state(BASE, students, courses, gradebook, settings)
-
-        elif c == "2":
-            cid = input("course id: ")
-            sid = input("student id: ")
-            aid = input("assessment id: ")
-            score = float(input("score: "))
-            record_grade(gradebook, cid, sid, {"id": aid, "score": score})
-            save_state(BASE, students, courses, gradebook, settings)
-
-        elif c == "3":
-            cid = input("course id: ")
-            sid = input("student id: ")
-            avg = calculate_student_average(gradebook, cid, sid)
-            print("avg =", avg, "=>", assign_letter_grade(avg))
-
-        else:
-            save_state(BASE, students, courses, gradebook, settings)
-            break
-
-if __name__ == "__main__":
-    menu()
