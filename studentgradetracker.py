@@ -6,14 +6,21 @@ def load_students(path: str) -> list:
             return json.load(f)
     except FileNotFoundError:
         return []
+#Program açıldığında eskiden kayıtlı öğrencileri geri almak için
+#Dosya yoksa program çökmesin diye try / except kullandık
 
 def save_students(path: str, students: list) -> None:
     with open(path, "w") as f:
         json.dump(students, f, indent=2)
+#Veriler program kapanınca silinmesin diye
+#JSON formatı okunabilir olsun diye indent=2
+#öğrenci kaydetme
 
 def add_student(students: list, student_data: dict) -> list:
     students.append(student_data)
     return students
+#Listeye yeni bir kayıt ekliyoruz
+#Güncel listeyi geri döndürüyoruz 
 
 def update_student(students: list, student_id: str, updates: dict) -> dict:
     for s in students:
@@ -21,6 +28,8 @@ def update_student(students: list, student_id: str, updates: dict) -> dict:
             s.update(updates)
             return s
     return {}
+#Tek tek öğrencileri kontrol ediyoruz
+#ID aynıysa bilgilerini güncelliyoruz
 
 def record_grade(gradebook: dict, course_id: str, student_id: str, assessment: dict) -> dict:
     course = gradebook.setdefault(course_id, {})
@@ -34,6 +43,9 @@ def update_grade(gradebook, course_id, student_id, assessment_id, new_score):
             a["score"] = new_score
             return a
     return {}
+#Öğrencinin tüm notlarına bak
+#ID’si eşleşeni bul
+#Yeni puanı yaz
 
 def delete_grade(gradebook, course_id, student_id, assessment_id):
     items = gradebook[course_id][student_id]
